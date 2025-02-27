@@ -1,6 +1,6 @@
 <template lang="html">
   <div>
-    <TodaysTasksList />
+    <listsTodaysTasks />
   </div>
 </template>
 <script setup lang="ts"></script>
