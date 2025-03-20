@@ -1,12 +1,8 @@
 <template lang="html">
-  <div class="card flex flex-col max-w-xl w-screen">
+  <div class="card flex flex-col max-w-2xl w-screen">
     <div class="flex justify-between items-center p-4 bg-white dark:bg-gray-800 shadow-sm rounded-t-lg">
       <div class="flex items-center gap-4">
         <h2 class="text-2xl font-bold text-gray-800 dark:text-white">Rewards Shop</h2>
-        <div class="flex items-center gap-2">
-          <span class="font-bold text-gray-800 dark:text-white">{{ points }}</span>
-          <Icon name="lucide:gem" class="text-xl text-yellow-500" />
-        </div>
       </div>
       <div class="flex gap-2">
         <button class="p-2 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg" @click="showEditor = true">
@@ -18,15 +14,15 @@
       </div>
     </div>
 
-    <div class="flex justify-center items-center flex-col max-w-xl w-screen bg-white dark:bg-gray-800 shadow-lg rounded-b-lg h-screen max-h-[500px]">
+    <div class="flex justify-center items-center flex-col max-w-2xl w-screen bg-white dark:bg-gray-800 shadow-lg rounded-b-lg h-screen max-h-[500px]">
       <ScrollPanel style="width: 100%; height: 100%;" class="w-full">
         <div class="px-5">
-          <div v-if="rewards.length === 0" class="flex flex-col items-center justify-center h-full text-gray-500 dark:text-gray-400">
+          <div v-if="rewards.length === 0" class="flex flex-col items-center justify-center h-[400px] text-gray-500 dark:text-gray-400">
             <Icon name="lucide:gift" class="text-6xl mb-4" />
             <p class="text-xl">No rewards available. Click the + button to add some rewards!</p>
           </div>
           <div v-else class="grid grid-cols-1 gap-4 py-4">
-            <div v-for="(reward, index) in rewards" :key="index" 
+            <div v-for="reward in rewards" :key="reward.id" 
               class="flex items-center justify-between p-4 border dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 bg-white dark:bg-gray-800">
               <div class="flex items-center gap-4">
                 <Icon :name="reward.icon" class="text-2xl dark:text-white" />
@@ -85,7 +81,13 @@
       </template>
     </Dialog>
 
-    <RewardsRewardEditor v-model:visible="showEditor" :rewards="rewards" @delete-reward="deleteReward" @edit-reward="editReward" />
+    <RewardsRewardEditor 
+      v-model:visible="showEditor" 
+      :rewards="rewards" 
+      @delete-reward="handleDeleteReward" 
+      @edit-reward="handleEditReward"
+      @delete-all="handleDeleteAll"
+    />
   </div>
 </template>
 
@@ -94,8 +96,11 @@ import { ref, watch, onMounted } from 'vue';
 import SharedIconSelector from '../shared/icon-selector.vue';
 import RewardsRewardEditor from './reward-editor.vue';
 import { useConfirm } from "primevue/useconfirm";
+import { v4 as uuidv4 } from 'uuid';
+import { useTaskStore } from '~/stores/tasks';
 
 interface Reward {
+  id: string;
   name: string;
   icon: string;
   cost: number;
@@ -106,6 +111,7 @@ const props = defineProps<{
 }>();
 
 const emit = defineEmits(['purchase-reward']);
+const taskStore = useTaskStore();
 const showDialog = ref(false);
 const showEditor = ref(false);
 
@@ -128,52 +134,52 @@ watch(rewards, (newRewards) => {
 }, { deep: true });
 
 const newReward = ref<Reward>({
+  id: '',
   name: '',
-  icon: 'lucide:gift',
+  icon: '',
   cost: 0
 });
 
 const addReward = () => {
   if (!newReward.value.name || !newReward.value.cost) return;
   
-  rewards.value.push({ ...newReward.value });
+  rewards.value.push({ 
+    ...newReward.value,
+    id: uuidv4(),
+    icon: newReward.value.icon || 'lucide:gift' // Default to gift icon if none selected
+  });
   showDialog.value = false;
   // Reset form
   newReward.value = {
+    id: '',
     name: '',
-    icon: 'lucide:gift',
+    icon: '',
     cost: 0
   };
 };
 
 const purchaseReward = (reward: Reward) => {
-  if (props.points >= reward.cost) {
-    emit('purchase-reward', reward);
+  if (taskStore.points >= reward.cost) {
+    taskStore.points -= reward.cost;
+    taskStore.saveToLocalStorage();
   }
 };
 
-const confirm = useConfirm();
-
-const deleteReward = (rewardToDelete: Reward) => {
-  confirm.require({
-    message: 'Are you sure you want to delete this reward?',
-    header: 'Delete Reward',
-    icon: 'pi pi-exclamation-triangle',
-    accept: () => {
-      const index = rewards.value.findIndex(reward => 
-        reward.name === rewardToDelete.name && 
-        reward.icon === rewardToDelete.icon && 
-        reward.cost === rewardToDelete.cost
-      );
-      if (index !== -1) {
-        rewards.value.splice(index, 1);
-      }
-    }
-  });
+const handleDeleteReward = (rewardToDelete: Reward) => {
+  const index = rewards.value.findIndex(reward => reward.id === rewardToDelete.id);
+  if (index !== -1) {
+    rewards.value.splice(index, 1);
+  }
 };
 
-const editReward = (reward: Reward) => {
-  // TODO: Implement reward editing
-  console.log('Edit reward:', reward);
+const handleEditReward = (rewardToEdit: Reward) => {
+  const index = rewards.value.findIndex(reward => reward.id === rewardToEdit.id);
+  if (index !== -1) {
+    rewards.value[index] = { ...rewardToEdit };
+  }
+};
+
+const handleDeleteAll = () => {
+  rewards.value = [];
 };
 </script> 

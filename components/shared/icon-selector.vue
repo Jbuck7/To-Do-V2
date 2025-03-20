@@ -23,6 +23,7 @@ defineEmits<{
 
 const availableIcons = [
   'lucide:gift',
+  'lucide:check',
   'lucide:coffee',
   'lucide:ice-cream',
   'lucide:gamepad',
@@ -51,7 +52,7 @@ const availableIcons = [
   'lucide:rocket',
   'lucide:clipboard-list',
   'lucide:clipboard-check',
-  'lucide:angry',
+
 
 ];
 </script> 
