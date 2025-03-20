@@ -21,14 +21,14 @@
           class="w-full"
         >
           <div class="px-5">
-            <div v-if="todaysTasks.length === 0" class="flex flex-col items-center justify-center h-full text-gray-500 dark:text-gray-400">
+            <div v-if="taskStore.todaysTasks.length === 0" class="flex flex-col items-center justify-center h-[400px] text-gray-500 dark:text-gray-400">
               <Icon name="lucide:clipboard-list" class="text-6xl mb-4" />
               <p class="text-xl">No tasks for today. Click the + button to add one!</p>
             </div>
             <listsTaskItem
               v-else
-              v-for="task in todaysTasks"
-              :key="task.name"
+              v-for="task in taskStore.todaysTasks"
+              :key="task.id"
               :name="task.name"
               :icon="task.icon"
               :reward="task.reward"
@@ -43,14 +43,14 @@
                 <button 
                   class="p-2 rounded-lg"
                   :class="[
-                    task.lastCompleted === today 
+                    task.isCompleted
                       ? 'text-green-600 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-900/20'
                       : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-900/20'
                   ]"
                   @click="toggleComplete(task)"
                 >
                   <Icon 
-                    :name="task.lastCompleted === today ? 'lucide:rotate-ccw' : 'lucide:check'" 
+                    :name="task.isCompleted ? 'lucide:rotate-ccw' : 'lucide:check'" 
                     class="text-xl"
                   />
                 </button>
@@ -61,8 +61,7 @@
       </div>
     </div>
 
-    <RewardsRewardsShop :points="points" @purchase-reward="handleRewardPurchase" />
-    <ListsTaskEditor v-model:visible="showEditor" :tasks="tasks" @delete-task="deleteTask" @edit-task="editTask" />
+    <ListsTaskEditor v-model:visible="showEditor" :tasks="taskStore.tasks" @delete-task="deleteTask" @edit-task="editTask" @delete-all="deleteAllTasks" />
 
     <Dialog v-model:visible="showDialog" modal header="Add Task" :style="{ width: '50vw' }" class="dark:bg-gray-800">
       <div class="flex flex-col gap-4">
@@ -177,117 +176,85 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue';
-import RewardsRewardsShop from '../rewards/rewards-shop.vue';
+import { ref, onMounted, watch } from 'vue';
+import { useTaskStore } from '~/stores/tasks';
 import ListsTaskEditor from './task-editor.vue';
 import SharedIconSelector from '../shared/icon-selector.vue';
 import { useConfirm } from "primevue/useconfirm";
 import { format } from 'date-fns';
+import { v4 as uuidv4 } from 'uuid';
 
-interface Task {
-  name: string;
-  icon: string;
-  reward: number;
-  days: string[];
-  lastCompleted?: string; // Store the date when task was last completed
-}
-
-// Initialize with empty defaults
-const tasks = ref<Task[]>([]);
-const points = ref<number>(0);
-
+const taskStore = useTaskStore();
 const confirm = useConfirm();
 
 // Load data from localStorage on client-side only
 onMounted(() => {
-  if (process.client) {
-    const savedTasks = localStorage.getItem('tasks');
-    const savedPoints = localStorage.getItem('points');
-    if (savedTasks) tasks.value = JSON.parse(savedTasks);
-    if (savedPoints) points.value = JSON.parse(savedPoints);
-  }
+  taskStore.loadFromLocalStorage();
 });
 
-// Watch for changes and save to localStorage on client-side only
-watch(tasks, (newTasks) => {
+// Watch for changes and save to localStorage
+watch(() => taskStore.tasks, (newTasks) => {
   if (process.client) {
     localStorage.setItem('tasks', JSON.stringify(newTasks));
   }
 }, { deep: true });
 
-watch(points, (newPoints) => {
+watch(() => taskStore.points, (newPoints) => {
   if (process.client) {
     localStorage.setItem('points', JSON.stringify(newPoints));
   }
 });
 
-const todaysTasks = computed(() => {
-  const today = new Date().toLocaleString('en-US', { weekday: 'long' });
-  const todayDate = new Date().toISOString().split('T')[0]; // Get today's date in YYYY-MM-DD format
-  
-  return tasks.value
-    .filter(task => task.days.includes(today))
-    .map(task => ({
-      ...task,
-      isCompleted: task.lastCompleted === todayDate
-    }));
-});
-
 const handleTaskComplete = (task: Task) => {
-  const todayDate = new Date().toISOString().split('T')[0];
-  const taskIndex = tasks.value.findIndex(t => 
-    t.name === task.name && 
-    t.icon === task.icon && 
-    t.reward === task.reward
-  );
-
-  if (taskIndex !== -1) {
-    if (tasks.value[taskIndex].lastCompleted === todayDate) {
-      // If task was completed today, uncomplete it and remove points
-      tasks.value[taskIndex].lastCompleted = undefined;
-      points.value -= task.reward;
-      console.log(`Task uncompleted, removed ${task.reward} points`);
-    } else {
-      // If task wasn't completed today, complete it and add points
-      tasks.value[taskIndex].lastCompleted = todayDate;
-      points.value += task.reward;
-      console.log(`Task completed with reward: ${task.reward}`);
-    }
+  if (task.isCompleted) {
+    taskStore.uncompleteTask(task.id);
+  } else {
+    taskStore.completeTask(task.id);
   }
-};
-
-const handleRewardPurchase = (reward: { cost: number }) => {
-  if (points.value >= reward.cost) {
-    points.value -= reward.cost;
-    console.log(`Purchased reward for ${reward.cost} points`);
-  }
-};
-
-const addNewTask = (task: Task) => {
-  tasks.value.push(task);
 };
 
 const deleteTask = (taskToDelete: Task) => {
-  const index = tasks.value.findIndex(task => 
-    task.name === taskToDelete.name && 
-    task.icon === taskToDelete.icon && 
-    task.reward === taskToDelete.reward
-  );
+  const index = taskStore.tasks.findIndex(task => task.id === taskToDelete.id);
   if (index !== -1) {
-    tasks.value.splice(index, 1);
+    taskStore.tasks.splice(index, 1);
   }
 };
 
-const showEditor = ref(false);
+const deleteAllTasks = () => {
+  taskStore.tasks = [];
+};
 
+const showEditor = ref(false);
+const showDialog = ref(false);
 const showEditDialog = ref(false);
-const editingTask = ref<Task>({
+
+const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+
+const newTask = ref({
   name: '',
   icon: 'lucide:check',
   reward: 0,
-  days: []
+  days: [...days]
 });
-const editingIndex = ref(-1);
+
+const editingTask = ref({
+  id: '',
+  name: '',
+  icon: 'lucide:check',
+  reward: 0,
+  days: [],
+  completed: {}
+});
+
+const toggleDay = (day: string) => {
+  const index = newTask.value.days.indexOf(day);
+  if (index === -1) {
+    newTask.value.days.push(day);
+    newTask.value.days.sort((a, b) => days.indexOf(a) - days.indexOf(b));
+  } else {
+    newTask.value.days.splice(index, 1);
+  }
+};
 
 const toggleEditDay = (day: string) => {
   const index = editingTask.value.days.indexOf(day);
@@ -300,54 +267,29 @@ const toggleEditDay = (day: string) => {
 };
 
 const editTask = (task: Task) => {
-  editingIndex.value = tasks.value.findIndex(t => 
-    t.name === task.name && 
-    t.icon === task.icon && 
-    t.reward === task.reward
-  );
-  
-  if (editingIndex.value !== -1) {
-    // Create a deep copy of the task to edit
-    editingTask.value = JSON.parse(JSON.stringify(tasks.value[editingIndex.value]));
-    showEditDialog.value = true;
-  }
+  editingTask.value = { ...task };
+  showEditDialog.value = true;
 };
 
 const saveEdit = () => {
-  if (editingIndex.value !== -1 && editingTask.value.name && editingTask.value.reward) {
-    tasks.value[editingIndex.value] = { 
-      ...editingTask.value,
-      // Preserve the completion status
-      lastCompleted: tasks.value[editingIndex.value].lastCompleted 
-    };
+  if (editingTask.value.name && editingTask.value.reward) {
+    const index = taskStore.tasks.findIndex(t => t.id === editingTask.value.id);
+    if (index !== -1) {
+      taskStore.tasks[index] = editingTask.value;
+    }
     showEditDialog.value = false;
-  }
-};
-
-const showDialog = ref(false);
-const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-const newTask = ref<Task>({
-  name: '',
-  icon: 'lucide:check',
-  reward: 0,
-  days: [...days]
-});
-
-const toggleDay = (day: string) => {
-  const index = newTask.value.days.indexOf(day);
-  if (index === -1) {
-    // Add the day and sort according to the original days array order
-    newTask.value.days.push(day);
-    newTask.value.days.sort((a, b) => days.indexOf(a) - days.indexOf(b));
-  } else {
-    newTask.value.days.splice(index, 1);
   }
 };
 
 const addTask = () => {
   if (!newTask.value.name || !newTask.value.reward) return;
   
-  tasks.value.push({ ...newTask.value });
+  taskStore.addTask({
+    id: uuidv4(),
+    ...newTask.value,
+    completed: {}
+  });
+  
   showDialog.value = false;
   // Reset form
   newTask.value = {
@@ -358,15 +300,11 @@ const addTask = () => {
   };
 };
 
-const today = format(new Date(), 'yyyy-MM-dd');
-
 const toggleComplete = (task: Task) => {
-  if (task.lastCompleted === today) {
-    task.lastCompleted = undefined;
-    points.value -= task.reward;
+  if (task.isCompleted) {
+    taskStore.uncompleteTask(task.id);
   } else {
-    task.lastCompleted = today;
-    points.value += task.reward;
+    taskStore.completeTask(task.id);
   }
 };
 </script>

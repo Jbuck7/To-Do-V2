@@ -6,6 +6,15 @@
         <p class="text-xl">No tasks available. Click the + button to add some tasks!</p>
       </div>
       <div v-else class="grid grid-cols-1 gap-4">
+        <div class="flex justify-end mb-4">
+          <button 
+            class="px-4 py-2 bg-red-600 dark:bg-red-700 text-white rounded-lg hover:bg-red-700 dark:hover:bg-red-800 flex items-center gap-2"
+            @click="confirmDeleteAll"
+          >
+            <Icon name="lucide:trash-2" />
+            Delete All
+          </button>
+        </div>
         <div v-for="task in tasks" :key="task.name" 
           class="flex items-center justify-between p-4 border dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 bg-white dark:bg-gray-800">
           <div class="flex items-center gap-4">
@@ -63,9 +72,20 @@ const isVisible = computed({
   set: (value) => emit('update:visible', value)
 });
 
-const emit = defineEmits(['update:visible', 'delete-task', 'edit-task']);
+const emit = defineEmits(['update:visible', 'delete-task', 'edit-task', 'delete-all']);
 
 const confirm = useConfirm();
+
+const confirmDeleteAll = () => {
+  confirm.require({
+    message: 'Are you sure you want to delete all tasks? This action cannot be undone.',
+    header: 'Delete All Tasks',
+    icon: 'pi pi-exclamation-triangle',
+    accept: () => {
+      emit('delete-all');
+    }
+  });
+};
 
 const confirmDelete = (taskToDelete: Task) => {
   confirm.require({
