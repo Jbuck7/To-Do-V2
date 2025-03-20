@@ -1,53 +1,36 @@
 <template lang="html">
-  <div
-    :class="{ 'bg-green-100': isCompleted }"
-    class="card flex items-center flex-row gap-10 max-w-xl w-screen h p-5 rounded-lg border-2 border-gray-300"
-  >
-    <Icon :name="icon" />
-    <h1 class="text-xl font-bold">{{ name }}</h1>
-    <div class="ml-auto p-2 flex items-center gap-2">
-      <span>{{ reward }}</span>
-      <Icon name="lucide:gem" />
-      <button
-        :class="{ 'bg-gray-400': isCompleted, 'bg-green-700': !isCompleted }"
-        class=" text-white rounded-xl w-14 h-10"
-        @click="taskComplete"
+  <div class="flex items-center justify-between p-4 border dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 mb-4 bg-white dark:bg-gray-800"
+       :class="{ 'opacity-75': isCompleted }">
+    <div class="flex items-center gap-4">
+      <Icon :name="icon" class="text-2xl dark:text-white" />
+      <h3 class="font-bold dark:text-white">{{ name }}</h3>
+    </div>
+    <div class="flex items-center gap-4">
+      <div class="flex items-center gap-2">
+        <span class="font-bold dark:text-white">{{ reward }}</span>
+        <Icon name="lucide:gem" class="text-xl text-yellow-500" />
+      </div>
+      <button 
+        class="px-4 py-2 rounded-lg flex items-center gap-2" 
+        :class="isCompleted ? 
+          'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600' : 
+          'bg-green-700 dark:bg-green-600 text-white hover:bg-green-800 dark:hover:bg-green-700'"
+        @click="$emit('task-complete')"
       >
-        <Icon :name="buttonIcon" class="text-white" />
+        <Icon :name="isCompleted ? 'lucide:rotate-ccw' : 'lucide:check'" class="text-xl" />
+        {{ isCompleted ? 'Undo' : 'Complete' }}
       </button>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from "vue";
+defineProps<{
+  name: string;
+  icon: string;
+  reward: number;
+  isCompleted: boolean;
+}>();
 
-const props = defineProps({
-  name: {
-    type: String,
-    default: "Task Name",
-  },
-  icon: {
-    type: String,
-    default: "tdesign:apple",
-  },
-  reward: {
-    type: Number,
-    default: 1000,
-  },
-});
-
-const isCompleted = ref(false);
-
-const buttonIcon = computed(() => {
-  return isCompleted.value ? "material-symbols:undo" : "lucide:check";
-});
-
-const emit = defineEmits(["taskComplete"]);
-
-const taskComplete = () => {
-  const rewardValue = isCompleted.value ? -props.reward : props.reward;
-  emit("taskComplete", rewardValue);
-  isCompleted.value = !isCompleted.value;
-};
+defineEmits(['task-complete']);
 </script>
