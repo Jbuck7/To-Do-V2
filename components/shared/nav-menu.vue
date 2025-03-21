@@ -41,6 +41,13 @@
               <Icon name="lucide:timer" class="text-xl" />
               <span>Pomodoro</span>
             </NuxtLink>
+            <button 
+              class="px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-300"
+              @click="showSettings = true"
+            >
+              <Icon name="lucide:settings" class="text-xl" />
+              <span>Settings</span>
+            </button>
           </div>
           <div class="flex items-center gap-2 px-4 py-2 ml-8 border-l border-gray-200 dark:border-gray-700">
             <span class="font-bold text-gray-800 dark:text-white">{{ taskStore.points }}</span>
@@ -50,10 +57,13 @@
       </div>
     </div>
   </nav>
+  <SettingsPopup v-model:visible="showSettings" />
 </template>
 
 <script setup lang="ts">
 import { useTaskStore } from '~/stores/tasks';
+import SettingsPopup from './settings-popup.vue';
 
 const taskStore = useTaskStore();
+const showSettings = ref(false);
 </script> 
